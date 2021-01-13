@@ -45,4 +45,40 @@ describe("GET / - a simple api endpoint", () => {
 
     expect(result.status).toEqual(404);
   });
+
+  it("Can add new routes and bulk delete them", async () => {
+    await request(app).post(adminPath).send({
+      method: "get",
+      path: "/api/v1/users",
+      response: {
+        body: [{ "id": 1, "name": "guy" }],
+        status: 200
+      }
+    });
+
+    let usersApi = await request(app).get("/api/v1/users");
+    expect(usersApi.status).toEqual(200);
+
+    await request(app).post(adminPath).send({
+      method: "post",
+      path: "/api/v1/private",
+      response: {
+        body: [{ "id": 1, "private": true }],
+        status: 400
+      }
+    });
+
+    let privateApi = await request(app).post("/api/v1/private");
+    expect(privateApi.status).toEqual(400);
+
+    const allRoutesDeleted = await request(app).delete(adminPath + "/all")
+    expect(allRoutesDeleted.status).toEqual(200)
+
+    usersApi = await request(app).get("/api/v1/users");
+    expect(usersApi.status).toEqual(404);
+
+    privateApi = await request(app).post("/api/v1/private");
+    expect(privateApi.status).toEqual(404);
+
+  });
 });

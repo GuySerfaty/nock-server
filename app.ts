@@ -1,5 +1,6 @@
 import express, { Router } from 'express';
 import { Method, AddRouteBody } from "./types"
+import morgan from "morgan";
 
 let mockHandlers: any = {};
 
@@ -25,6 +26,8 @@ const removeMiddlewares = (route: any, i: number, routes: any, method: Method, p
 const app = express();
 
 app.use(express.json());
+app.use(morgan("tiny"));
+
 app.get('/', (req, res) => res.send('hello'));
 
 const adminPath = '/_routes'
@@ -34,14 +37,14 @@ app.get(adminPath, (req, res) => {
     const routeKey = getRouteKey(queryMethod as Method, queryPath as string);
     if (!mockHandlers[routeKey]) {
       console.log('mock not found');
-      return res.status(500).send({ error: 'mock not found' });
+      return res.status(500).json({ error: 'mock not found' });
     }
     const { count, method, path, stubRequests, response } = mockHandlers[routeKey];
-    return res.send({
+    return res.json({
       count, method, path, stubRequests, response
     });
   }
-  return res.send(Object.keys(mockHandlers).map(routeKey => {
+  return res.json(Object.keys(mockHandlers).map(routeKey => {
     const { count, method, path, stubRequests } = mockHandlers[routeKey];
     return {
       count, method, path, stubRequests
@@ -57,7 +60,7 @@ app.post(adminPath, (req, res) => {
     response,
   }: AddRouteBody = req.body
   if (!method || !path || !response) {
-    return res.status(500).send('Should provide : !method || ! path || !response')
+    return res.status(500).json('Should provide : !method || ! path || !response')
   }
 
   const newRouteKey = getRouteKey(method, path);
@@ -71,11 +74,11 @@ app.post(adminPath, (req, res) => {
     middleware: (req: any, res: any) => {
       mockHandlers[newRouteKey].count += 1;
       mockHandlers[newRouteKey].stubRequests.push({ params: req.params, query: req.query, body: req.body, headers: req.headers });
-      return res.status(response.status || 200).send(response.body)
+      return res.status(response.status || 200).json(response.body)
     }
   }
   app[method](path, mockHandlers[newRouteKey].middleware);
-  return res.send('added')
+  return res.json('added')
 });
 
 

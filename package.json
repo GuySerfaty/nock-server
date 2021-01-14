@@ -6,7 +6,8 @@
   "scripts": {
     "test": "jest",
     "build": "tsc --project ./",
-    "start": "nodemon index.ts"
+    "start": "nodemon index.ts",
+    "startProxy": "PROXY_URL=http://localhost:5000 nodemon index.ts"
   },
   "jest": {
     "moduleFileExtensions": [

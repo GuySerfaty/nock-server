@@ -1,7 +1,10 @@
 import express, { Router } from 'express';
 import { Method, AddRouteBody } from "./types"
 
+const { PROXY_URL } = process.env
+
 let mockHandlers: any = {};
+const adminPath = '/_routes'
 
 const getRouteKey = (method: Method, path: string) => `[${method}]${path}`
 
@@ -28,7 +31,6 @@ app.use(express.json());
 
 app.get('/', (req, res) => res.send('hello'));
 
-const adminPath = '/_routes'
 app.get(adminPath, (req, res) => {
   const { method: queryMethod, path: queryPath } = req.query;
   if (queryMethod && queryPath) {
@@ -72,9 +74,13 @@ app.post(adminPath, (req, res) => {
     middleware: (req: any, res: any) => {
       mockHandlers[newRouteKey].count += 1;
       mockHandlers[newRouteKey].stubRequests.push({ params: req.params, query: req.query, body: req.body, headers: req.headers });
+      if (PROXY_URL) {
+        return res.status(301).redirect(PROXY_URL + path)
+      }
       return res.status(response.status || 200).json(response.body)
     }
   }
+
   app[method](path, mockHandlers[newRouteKey].middleware);
   return res.json('added')
 });

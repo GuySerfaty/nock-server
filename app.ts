@@ -1,6 +1,5 @@
 import express, { Router } from 'express';
 import { Method, AddRouteBody } from "./types"
-import morgan from "morgan";
 
 let mockHandlers: any = {};
 
@@ -26,7 +25,6 @@ const removeMiddlewares = (route: any, i: number, routes: any, method: Method, p
 const app = express();
 
 app.use(express.json());
-app.use(morgan("tiny"));
 
 app.get('/', (req, res) => res.send('hello'));
 

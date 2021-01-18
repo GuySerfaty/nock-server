@@ -82,7 +82,7 @@ app.post(adminPath, (req, res) => {
   }
 
   app[method](path, mockHandlers[newRouteKey].middleware);
-  return res.json('added')
+  return res.json({ success: 'added' })
 });
 
 
@@ -90,9 +90,11 @@ app.post(adminPath, (req, res) => {
 
 app.delete(adminPath, (req, res) => {
   const { path, method } = req.body
+  console.log(path, method);
+
   const routes = app._router.stack;
   routes.forEach((route: any, i: number, routes: any) => removeMiddlewares(route, i, routes, method, path));
-  return res.send('canceled')
+  return res.json({ success: 'canceled' })
 });
 
 

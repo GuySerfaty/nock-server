@@ -1,38 +1,51 @@
 import express, { Router } from 'express';
+import { Method, AddRouteBody } from "./types"
 
-interface AddRouteBody {
-  method: 'all' | 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options' | 'head';
-  path: string;
-  response: {
-    body: any;
-    status: number;
-  };
-}
+const { PROXY_URL } = process.env
 
 let mockHandlers: any = {};
+const adminPath = '/_routes'
 
-const getRouteKey = (method: AddRouteBody["method"], path: string) => `[${method}]${path}`
+const getRouteKey = (method: Method, path: string) => `[${method}]${path}`
+
+const extractRouteKey = (route: string) => {
+  const splittedRoute = route.split("]")
+  const path = splittedRoute[1];
+  const method = splittedRoute[0].split("[")[1]
+  return ({ path, method })
+}
+
+
+const removeMiddlewares = (route: any, i: number, routes: any, method: Method, path: string) => {
+  const existingMock = mockHandlers[getRouteKey(method, path)];
+  if (existingMock && existingMock.middleware === route.handle) {
+    console.log("deleted", path);
+    routes.splice(i, 1);
+  }
+  if (route.route)
+    route.route.stack.forEach((route: any, i: number, routes: any) => removeMiddlewares(route, i, routes, method, path));
+}
 
 const app = express();
 
 app.use(express.json());
+
 app.get('/', (req, res) => res.send('hello'));
 
-const adminPath = '/_routes'
 app.get(adminPath, (req, res) => {
   const { method: queryMethod, path: queryPath } = req.query;
   if (queryMethod && queryPath) {
-    const routeKey = getRouteKey(queryMethod as AddRouteBody["method"], queryPath as string);
+    const routeKey = getRouteKey(queryMethod as Method, queryPath as string);
     if (!mockHandlers[routeKey]) {
       console.log('mock not found');
-      return res.status(500).send({ error: 'mock not found' });
+      return res.status(500).json({ error: 'mock not found' });
     }
     const { count, method, path, stubRequests, response } = mockHandlers[routeKey];
-    return res.send({
+    return res.json({
       count, method, path, stubRequests, response
     });
   }
-  return res.send(Object.keys(mockHandlers).map(routeKey => {
+  return res.json(Object.keys(mockHandlers).map(routeKey => {
     const { count, method, path, stubRequests } = mockHandlers[routeKey];
     return {
       count, method, path, stubRequests
@@ -46,9 +59,9 @@ app.post(adminPath, (req, res) => {
     method,
     path,
     response,
-  } : AddRouteBody = req.body
-  if (!method || ! path || !response) {
-    return res.status(500).send('Should provide : !method || ! path || !response')
+  }: AddRouteBody = req.body
+  if (!method || !path || !response) {
+    return res.status(500).json('Should provide : !method || ! path || !response')
   }
 
   const newRouteKey = getRouteKey(method, path);
@@ -59,29 +72,44 @@ app.post(adminPath, (req, res) => {
     path,
     response,
     stubRequests: [],
-    middleware: (req:any, res:any) => {
+    middleware: (req: any, res: any) => {
       mockHandlers[newRouteKey].count += 1;
-      // console.log('reqreq', req)
       mockHandlers[newRouteKey].stubRequests.push({ params: req.params, query: req.query, body: req.body, headers: req.headers });
-      return res.status(response.status || 200).send(response.body)
+      if (PROXY_URL) {
+        return res.status(301).redirect(PROXY_URL + path)
+      }
+      return res.status(response.status || 200).json(response.body)
     }
   }
+
   app[method](path, mockHandlers[newRouteKey].middleware);
-  return res.send('added')
+  return res.json({ success: 'added' })
 });
+
+
+
+
 app.delete(adminPath, (req, res) => {
   const { path, method } = req.body
   const routes = app._router.stack;
-  routes.forEach(removeMiddlewares);
-  function removeMiddlewares(route: any, i: number, routes: any) {
-    const existingMock = mockHandlers[getRouteKey(method, path)];
-      if (existingMock && existingMock.middleware === route.handle) {
-        routes.splice(i, 1);
-      }
-      if (route.route)
-          route.route.stack.forEach(removeMiddlewares);
-  }
-  return res.send('canceled')
+  routes.forEach((route: any, i: number, routes: any) => removeMiddlewares(route, i, routes, method, path));
+  return res.json({ success: 'canceled' })
 });
+
+
+app.delete(adminPath + "/all", (req, res) => {
+  try {
+    for (const handler in mockHandlers) {
+      const { method, path } = extractRouteKey(handler)
+      const routes = app._router.stack;
+      //@ts-ignore
+      routes.forEach((route: any, i: number, routes: any) => removeMiddlewares(route, i, routes, method, path));
+    }
+    return res.json({ success: true })
+  } catch (e) {
+
+    res.status(400).json({ error: e.message })
+  }
+})
 
 export default app;

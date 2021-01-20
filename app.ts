@@ -19,6 +19,7 @@ const extractRouteKey = (route: string) => {
 const removeMiddlewares = (route: any, i: number, routes: any, method: Method, path: string) => {
   const existingMock = mockHandlers[getRouteKey(method, path)];
   if (existingMock && existingMock.middleware === route.handle) {
+    console.log("deleted", path);
     routes.splice(i, 1);
   }
   if (route.route)
